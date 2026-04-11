@@ -7,6 +7,27 @@ import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from "@
 import { Reflector } from "@nestjs/core";
 import { Request } from "express";
 
+const CAL_DOMAINS = [".cal.com", ".cal.dev", ".cal.eu", ".cal.qa", ".cal-staging.com"];
+
+function ensureProtocol(url: string | undefined) {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  return `https://${url}`;
+}
+
+function isSelfHostedDeployment() {
+  const configuredUrl =
+    process.env.WEB_APP_URL ||
+    process.env.NEXT_PUBLIC_WEBAPP_URL ||
+    process.env.RAILWAY_SERVICE_WEB_URL ||
+    process.env.RAILWAY_STATIC_URL;
+  const normalizedUrl = ensureProtocol(configuredUrl);
+  if (!normalizedUrl) return false;
+
+  const hostname = new URL(normalizedUrl).hostname;
+  return !CAL_DOMAINS.some((domain) => hostname.endsWith(domain));
+}
+
 @Injectable()
 export class PlatformPlanGuard implements CanActivate {
   constructor(
@@ -49,6 +70,10 @@ export class PlatformPlanGuard implements CanActivate {
       throw new ForbiddenException(`PlatformPlanGuard - No organization found with id=${orgId}.`);
     }
     if (!isPlatform) {
+      await this.redisService.redis.set(REDIS_CACHE_KEY, "true", "EX", 300);
+      return true;
+    }
+    if (isSelfHostedDeployment()) {
       await this.redisService.redis.set(REDIS_CACHE_KEY, "true", "EX", 300);
       return true;
     }
