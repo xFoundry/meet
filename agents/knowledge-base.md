@@ -92,3 +92,17 @@ Workflows and webhooks are two completely separate features in Cal.com with diff
 - NOT in the webhooks directory
 
 When working on workflow triggers, do not reference or use webhook trigger implementations - they are distinct systems.
+
+## Mentor v1 Hasura schema reference
+
+For Mentor v1 planning, the canonical schema reference lives in Outline:
+- `Mentor v1 Schema Reference: Hasura-First Model for CON-252`
+
+Key invariants to keep in repo memory:
+- Hub is **Hasura-first**, not BaseQL-first.
+- Hasura `Sessions` is the local mentorship session mirror.
+- Hasura `Session_Participants` is the roster model.
+- Hasura `session_feedback` is part of the session-domain model.
+- `Sessions.team` should be treated as required because each session belongs to exactly one team.
+- Session ownership and requester identity are distinct, so `Sessions` should also model `booked_by_contact_id` / requester contact separately from team ownership.
+- Airtable source schemas for `Sessions`, `Session Participants`, and `Session Feedback` should be treated as the source shape to port properly into Postgres/Hasura.
