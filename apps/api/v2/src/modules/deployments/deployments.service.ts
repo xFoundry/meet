@@ -1,15 +1,19 @@
-import { DeploymentsRepository } from "@/modules/deployments/deployments.repository";
-import { RedisService } from "@/modules/redis/redis.service";
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { DeploymentsRepository } from "@/modules/deployments/deployments.repository";
+import { RedisService } from "@/modules/redis/redis.service";
 
 const CACHING_TIME = 86400000; // 24 hours in milliseconds
 
-const getLicenseCacheKey = (key: string) => `api-v2-license-key-goblin-url-${key}`;
+const getLicenseCacheKey = (key: string): string => `api-v2-license-key-goblin-url-${key}`;
 
 type LicenseCheckResponse = {
-  status: boolean;
+  status?: boolean;
+  valid?: boolean;
 };
+
+const isLicenseCheckValid = (data: LicenseCheckResponse): boolean => data.status ?? data.valid ?? false;
+
 @Injectable()
 export class DeploymentsService {
   constructor(
@@ -18,7 +22,7 @@ export class DeploymentsService {
     private readonly redisService: RedisService
   ) {}
 
-  async checkLicense() {
+  async checkLicense(): Promise<boolean> {
     if (this.configService.get("e2e")) {
       return true;
     }
@@ -33,15 +37,15 @@ export class DeploymentsService {
     if (!licenseKey) {
       return false;
     }
-    const licenseKeyUrl = this.configService.get("api.licenseKeyUrl") + `/${licenseKey}`;
+    const licenseKeyUrl = `${this.configService.get("api.licenseKeyUrl")}/${licenseKey}`;
     const cachedData = await this.redisService.redis.get(getLicenseCacheKey(licenseKey));
     if (cachedData) {
-      return (JSON.parse(cachedData) as LicenseCheckResponse)?.status;
+      return isLicenseCheckValid(JSON.parse(cachedData) as LicenseCheckResponse);
     }
     const response = await fetch(licenseKeyUrl, { mode: "cors" });
     const data = (await response.json()) as LicenseCheckResponse;
     const cacheKey = getLicenseCacheKey(licenseKey);
     this.redisService.redis.set(cacheKey, JSON.stringify(data), "EX", CACHING_TIME);
-    return data.status;
+    return isLicenseCheckValid(data);
   }
 }
