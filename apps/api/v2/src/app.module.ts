@@ -1,12 +1,14 @@
 import { ThrottlerStorageRedisService } from "@nest-lab/throttler-storage-redis";
 import { BullModule } from "@nestjs/bull";
 import { MiddlewareConsumer, Module, NestModule, RequestMethod } from "@nestjs/common";
-import { ConfigModule } from "@nestjs/config";
+import { ConfigModule, ConfigService } from "@nestjs/config";
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
 import { seconds, ThrottlerModule } from "@nestjs/throttler";
 import { SentryGlobalFilter, SentryModule } from "@sentry/nestjs/setup";
 import { AppController } from "./app.controller";
 import appConfig from "@/config/app";
+import { buildRedisConnectionOptions } from "@/config/redis";
+import type { AppConfig } from "@/config/type";
 import { CustomThrottlerGuard } from "@/lib/throttler-guard";
 import { AppLoggerMiddleware } from "@/middleware/app.logger.middleware";
 import { RedirectsMiddleware } from "@/middleware/app.redirects.middleware";
@@ -34,8 +36,12 @@ import { VercelWebhookController } from "@/vercel-webhook.controller";
     }),
 
     RedisModule,
-    BullModule.forRoot({
-      redis: `${process.env.REDIS_URL}${process.env.NODE_ENV === "production" ? "?tls=true" : ""}`,
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService<AppConfig>) => ({
+        redis: buildRedisConnectionOptions(configService.getOrThrow("db.redisUrl", { infer: true })),
+      }),
     }),
     ThrottlerModule.forRootAsync({
       imports: [RedisModule],

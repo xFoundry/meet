@@ -1,7 +1,8 @@
-import { AppConfig } from "@/config/type";
-import { Injectable, OnModuleDestroy, Logger } from "@nestjs/common";
+import { Injectable, Logger, OnModuleDestroy } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Redis } from "ioredis";
+import { buildRedisConnectionOptions } from "@/config/redis";
+import type { AppConfig } from "@/config/type";
 
 @Injectable()
 export class RedisService implements OnModuleDestroy {
@@ -13,7 +14,7 @@ export class RedisService implements OnModuleDestroy {
     const dbUrl = configService.get<string>("db.redisUrl", { infer: true });
     if (!dbUrl) throw new Error("Misconfigured Redis, halting.");
 
-    this.redis = new Redis(dbUrl);
+    this.redis = new Redis(buildRedisConnectionOptions(dbUrl));
 
     this.redis.on("error", (err) => {
       this.logger.error(`IoRedis connection error: ${err.message}`);

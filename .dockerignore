@@ -34,3 +34,7 @@ Thumbs.db
 
 # Examples and docs
 docs
+
+# API v2 imports runtime header definitions from its nested docs module.
+!apps/api/v2/src/lib/docs/
+!apps/api/v2/src/lib/docs/**
