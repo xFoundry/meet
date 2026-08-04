@@ -2,6 +2,13 @@ import type { RedisOptions } from "ioredis";
 
 const REDIS_PROTOCOLS: ReadonlySet<string> = new Set(["redis:", "rediss:"]);
 const DEFAULT_REDIS_PORT = 6379;
+const NUMERIC_QUERY_OPTIONS = [
+  "commandTimeout",
+  "connectTimeout",
+  "disconnectTimeout",
+  "keepAlive",
+  "maxLoadingRetryTime",
+] as const;
 
 function parseDatabase(pathname: string): number {
   const value = pathname.replace(/^\//, "");
@@ -25,6 +32,36 @@ function decodeCredential(value: string): string {
   } catch {
     throw new Error("REDIS_URL credentials must use valid percent-encoding.");
   }
+}
+
+function normalizeHostname(hostname: string): string {
+  if (hostname.startsWith("[") && hostname.endsWith("]")) {
+    return hostname.slice(1, -1);
+  }
+
+  return hostname;
+}
+
+function parseQueryOptions(searchParams: URLSearchParams): Record<string, string | number> {
+  const options: Record<string, string | number> = Object.fromEntries(searchParams);
+
+  // Transport is controlled by the URL itself so callers cannot override the
+  // dual-stack lookup or opt into TLS on a plaintext redis:// connection.
+  delete options.family;
+  delete options.tls;
+
+  for (const name of NUMERIC_QUERY_OPTIONS) {
+    const rawValue = searchParams.get(name);
+    if (rawValue === null) continue;
+
+    const value = Number(rawValue);
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new Error(`REDIS_URL ${name} must be a non-negative safe integer.`);
+    }
+    options[name] = value;
+  }
+
+  return options;
 }
 
 /**
@@ -54,7 +91,8 @@ export function buildRedisConnectionOptions(rawUrl: string): RedisOptions {
   }
 
   const options: RedisOptions = {
-    host: url.hostname,
+    ...parseQueryOptions(url.searchParams),
+    host: normalizeHostname(url.hostname),
     port,
     db: parseDatabase(url.pathname),
     family: 0,

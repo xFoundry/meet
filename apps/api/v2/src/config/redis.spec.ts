@@ -40,6 +40,31 @@ describe("buildRedisConnectionOptions", () => {
     });
   });
 
+  it("normalizes literal IPv6 hosts for ioredis", () => {
+    const result = buildRedisConnectionOptions("redis://[::1]:6379/0");
+
+    expect(result).toMatchObject({
+      host: "::1",
+      port: 6379,
+      db: 0,
+      family: 0,
+    });
+  });
+
+  it("preserves supported URL options while enforcing connection invariants", () => {
+    const result = buildRedisConnectionOptions(
+      "redis://cache.example.com/0?connectTimeout=25000&keepAlive=1000&keyPrefix=cal&family=4&tls=true"
+    );
+
+    expect(result).toMatchObject({
+      connectTimeout: 25000,
+      keepAlive: 1000,
+      keyPrefix: "cal",
+      family: 0,
+    });
+    expect(result.tls).toBeUndefined();
+  });
+
   it.each([
     "not-a-url",
     "https://cache.example.com",
